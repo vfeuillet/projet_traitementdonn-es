@@ -1,2 +1,2 @@
-#code
-#edit
+import numpy as np
+import matplotlib.pyplot aas plt
