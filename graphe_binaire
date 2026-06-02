@@ -1,0 +1,71 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+
+# 1. Chargement du jeu de données
+df = pd.read_csv('retail_fraud_detection_100k.csv')
+
+# 2. Échantillonnage pour un rendu visuel propre sans saturation (4000 points)
+df_sample = df.sample(4000, random_state=42)
+
+# 3. Application du "Jittering" (dispersion artificielle autour de 0 et 1)
+np.random.seed(42)
+jitter_x = df_sample['multiple_transactions_short_time'] + np.random.normal(0, 0.08, size=len(df_sample))
+jitter_y = df_sample['unusual_location_flag'] + np.random.normal(0, 0.08, size=len(df_sample))
+
+fig, ax = plt.subplots(figsize=(9, 9))
+
+# Tracé des lignes de démarcation en pointillés pour séparer le plan
+ax.axhline(0.5, color='#333333', linewidth=2, linestyle='--')
+ax.axvline(0.5, color='#333333', linewidth=2, linestyle='--')
+
+# Définition des couleurs selon la colonne T (fraud_flag)
+# Vert (#4cab31) pour Légitime (0), Rouge (#d9534f) pour Fraude (1)
+colors = np.where(df_sample['fraud_flag'] == 1, '#d9534f', '#4cab31')
+
+# Affichage du nuage de points (alpha=0.4 pour gérer la transparence et voir la densité)
+ax.scatter(jitter_x, jitter_y, c=colors, s=12, alpha=0.4, edgecolors='none', zorder=1)
+
+# Textes et statistiques associés aux quadrants
+data = [
+    {"x": 0.12, "y": 0.12, "title": "Zone Bas-Gauche (0, 0)\nSain", "pct": "Taux de Fraude : 11.5%"},
+    {"x": 0.88, "y": 0.12, "title": "Zone Bas-Droite (1, 0)\nTemps Court Seul", "pct": "Taux de Fraude : 47.0%"},
+    {"x": 0.12, "y": 0.88, "title": "Zone Haut-Gauche (0, 1)\nLieu Inhabituel Seul", "pct": "Taux de Fraude : 54.0%"},
+    {"x": 0.88, "y": 0.88, "title": "Zone Haut-Droite (1, 1)\nDouble Alerte", "pct": "Taux de Fraude : 88.1%"}
+]
+
+# Insertion des encadrés statistiques (avec un fond blanc opaque pour rester lisibles)
+for q in data:
+    ax.text(q["x"], q["y"] + 0.05, q["title"], fontsize=11, weight='bold', ha='center', va='center',
+            bbox=dict(facecolor='white', alpha=0.85, edgecolor='gray', boxstyle='round,pad=0.3'), zorder=3)
+    ax.text(q["x"], q["y"] - 0.03, q["pct"], fontsize=11, weight='bold', color='#721c24', ha='center', va='center',
+            bbox=dict(facecolor='white', alpha=0.85, edgecolor='gray', boxstyle='round,pad=0.2'), zorder=3)
+
+# Ajustement des limites des axes pour englober les nuages
+ax.set_xlim(-0.2, 1.2)
+ax.set_ylim(-0.2, 1.2)
+
+# Personnalisation des graduations
+ax.set_xticks([0, 1])
+ax.set_xticklabels(['Normal (0)', 'Transactions Rapprochées (1)'], fontsize=11)
+ax.set_yticks([0, 1])
+ax.set_yticklabels(['Normal (0)', 'Lieu Inhabituel (1)'], fontsize=11, rotation=90, va='center')
+
+# Labellisation complète
+ax.set_xlabel("Colonne Q : multiple_transactions_short_time", fontsize=12, labelpad=12, weight='bold')
+ax.set_ylabel("Colonne P : unusual_location_flag", fontsize=12, labelpad=15, weight='bold')
+ax.set_title("Visualisation par Clusters en 4 Quadrants\nDispersion des transactions (T : fraud_flag) selon P et Q", fontsize=13, pad=20, weight='bold')
+
+# Légende personnalisée en bas
+legend_elements = [
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='#4cab31', markersize=9, label='Légitime (T=0)'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='#d9534f', markersize=9, label='Fraude (T=1)')
+]
+ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.12), ncol=2, fontsize=11)
+
+fig.tight_layout()
+fig.savefig('plan_4_quadrants_clusters_PQ_T.png', dpi=300)
+plt.close(fig)
+
+print("Graphique de dispersion par clusters enregistré sous 'plan_4_quadrants_clusters_PQ_T.png'.")
