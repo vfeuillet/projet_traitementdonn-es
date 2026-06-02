@@ -1,6 +1,31 @@
-import numpy as np
-import matplotlib.pyplot aas plt
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.ensemble import RandomForestClassifier
 
-df=pd.readcsv("chemin/retail_fraud_detection_100k.csv")
+# Configuration du style des graphiques
+sns.set_theme(style="whitegrid")
+plt.rcParams['figure.figsize'] = (12, 8)
+
+# 1. CHARGEMENT DES DONNÉES
+print("Chargement des données en cours...")
+df = pd.read_csv('retail_fraud_detection_100k.csv') 
+
+# === ÉTAPE DE NETTOYAGE IMPÉRATIVE POUR ÉVITER LES NaNs ET INFs ===
+# A. Suppression des lignes où des valeurs essentielles sont manquantes (NaN)
+df = df.dropna(subset=['transaction_amount', 'account_age_days', 'failed_transaction_count_24h', 'fraud_flag'])
+
+# B. Protection pour l'échelle logarithmique : si le montant est <= 0, on le remplace par un très petit nombre
+df['transaction_amount'] = df['transaction_amount'].apply(lambda x: x if x > 0 else 0.01)
+
+# Suppression des identifiants inutiles pour l'analyse graphique brute
+df_analysable = df.drop(columns=['transaction_id', 'customer_id'])
+
+table = pd.crosstab(
+    [df['unusual_amount_flag'] , df['unusual_location_flag']],
+    df['fraud_flag']
+)
+
+sns.heatmap(table, annot=True, fmt='d', cmap='Blues')
+plt.show()
