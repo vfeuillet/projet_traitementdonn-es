@@ -1,31 +1,96 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.ensemble import RandomForestClassifier
+from matplotlib.lines import Line2D
 
-# Configuration du style des graphiques
-sns.set_theme(style="whitegrid")
-plt.rcParams['figure.figsize'] = (12, 8)
+# 1. Chargement du jeu de données
+df = pd.read_csv('retail_fraud_detection_100k.csv')
 
-# 1. CHARGEMENT DES DONNÉES
-print("Chargement des données en cours...")
-df = pd.read_csv('retail_fraud_detection_100k.csv') 
+# 2. Échantillonnage pour un rendu visuel propre sans saturation (4000 points)
+df_sample = df.sample(300, random_state=42)
 
-# === ÉTAPE DE NETTOYAGE IMPÉRATIVE POUR ÉVITER LES NaNs ET INFs ===
-# A. Suppression des lignes où des valeurs essentielles sont manquantes (NaN)
-df = df.dropna(subset=['transaction_amount', 'account_age_days', 'failed_transaction_count_24h', 'fraud_flag'])
+# 3. Application du "Jittering" (dispersion artificielle autour de 0 et 1)
+np.random.seed(42)
+jitter_x = df_sample['unusual_amount_flag'] + np.random.normal(0, 0.12, size=len(df_sample))
+jitter_y = df_sample['unusual_location_flag'] + np.random.normal(0, 0.12, size=len(df_sample))
 
-# B. Protection pour l'échelle logarithmique : si le montant est <= 0, on le remplace par un très petit nombre
-df['transaction_amount'] = df['transaction_amount'].apply(lambda x: x if x > 0 else 0.01)
+fig, ax = plt.subplots(figsize=(9, 9))
 
-# Suppression des identifiants inutiles pour l'analyse graphique brute
-df_analysable = df.drop(columns=['transaction_id', 'customer_id'])
+# Tracé des lignes de démarcation en pointillés pour séparer le plan
+ax.axhline(0.5, color='#333333', linewidth=2, linestyle='--')
+ax.axvline(0.5, color='#333333', linewidth=2, linestyle='--')
 
-table = pd.crosstab(
-    [df['unusual_amount_flag'] , df['unusual_location_flag']],
-    df['fraud_flag']
+# Définition des couleurs selon la colonne T (fraud_flag)
+# Vert (#4cab31) pour Légitime (0), Rouge (#d9534f) pour Fraude (1)
+colors = np.where(df_sample['fraud_flag'] == 1, "#ff0800", "#37ff00")
+
+#Pour extraire les valeurs ou previous_fraud_flag==1
+mask_prev_fraud = df_sample['previous_fraud_flag'] == 1
+
+
+#Definition des tailles associés aux risque de fraude 
+size_map = {
+    'Low': 75,
+    'Medium': 300,
+    'High': 750
+}
+
+sizes = df_sample['fraud_risk'].map(size_map)
+
+
+# Affichage du nuage de points
+# previous_fraud_flag = 0 → cercle
+ax.scatter(
+    jitter_x[~mask_prev_fraud],
+    jitter_y[~mask_prev_fraud],
+    c=colors[~mask_prev_fraud],
+    s=sizes[~mask_prev_fraud],
+    marker='o',
+    alpha=0.5,
+    edgecolors='none',
+    zorder=0
 )
 
-sns.heatmap(table, annot=True, fmt='d', cmap='Blues')
+# previous_fraud_flag = 1 → carré
+ax.scatter(
+    jitter_x[mask_prev_fraud],
+    jitter_y[mask_prev_fraud],
+    c=colors[mask_prev_fraud],
+    s=sizes[mask_prev_fraud],
+    marker='s',
+    alpha=0.5,
+    edgecolors='none',
+    zorder=0
+)
+
+
+# Ajustement des limites des axes pour englober les nuages
+ax.set_xlim(-0.5, 1.5)
+ax.set_ylim(-0.5, 1.5)
+
+# Personnalisation des graduations
+ax.set_xticks([0, 1])
+ax.set_yticks([0, 1])
+
+# Labellisation complète
+ax.set_xlabel("Unusual_amount_flag", fontsize=12, labelpad=12, weight='bold')
+ax.set_ylabel("Unusual_location_flag", fontsize=12, labelpad=15, weight='bold')
+
+# Légende personnalisée en bas
+legend_elements = [
+    Line2D([0], [0], marker='o', color='w', markerfacecolor="#37ff00", markersize=9, label='Légitime (T=0)'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor="#ff0800", markersize=9, label='Fraude (T=1)'),
+    Line2D([0], [0], marker='o', color='black', linestyle='', markersize=9, label='previous_fraud_flag = 0'),
+    Line2D([0], [0], marker='s', color='black', linestyle='', markersize=9, label='previous_fraud_flag = 1'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=np.sqrt(75),label='Low'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=np.sqrt(350),label='Medium'),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=np.sqrt(750), label='High')
+]
+ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0.5, -0.12), ncol=2, fontsize=11)
+
+fig.tight_layout()
 plt.show()
+
+
+print(df_sample['fraud_risk'].unique())
+print(sizes.isna().sum())
