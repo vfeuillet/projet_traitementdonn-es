@@ -1,0 +1,137 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.ensemble import RandomForestClassifier
+
+# Configuration du style des graphiques
+sns.set_theme(style="whitegrid")
+plt.rcParams['figure.figsize'] = (12, 8)
+
+# 1. CHARGEMENT DES DONNÉES
+print("Chargement des données en cours...")
+df = pd.read_csv('retail_fraud_detection_100k.csv') 
+
+# === ÉTAPE DE NETTOYAGE IMPÉRATIVE POUR ÉVITER LES NaNs ET INFs ===
+# A. Suppression des lignes où des valeurs essentielles sont manquantes (NaN)
+df = df.dropna(subset=['transaction_amount', 'account_age_days', 'failed_transaction_count_24h', 'fraud_flag'])
+
+# B. Protection pour l'échelle logarithmique : si le montant est <= 0, on le remplace par un très petit nombre
+df['transaction_amount'] = df['transaction_amount'].apply(lambda x: x if x > 0 else 0.01)
+
+# Suppression des identifiants inutiles pour l'analyse graphique brute
+df_analysable = df.drop(columns=['transaction_id', 'customer_id'])
+
+
+# ==========================================
+# GRAPH SCRIPT 1 : Distribution de la Target (Correction du FutureWarning)
+# ==========================================
+plt.figure(figsize=(6, 5))
+# Correction ici : assignation de x à hue et désactivation de la légende
+sns.countplot(data=df_analysable, x='fraud_flag', hue='fraud_flag', palette='Set1', legend=False)
+plt.title("Distribution de la variable cible (Fraud Flag)\n[Idéal pour analyser le déséquilibre]", fontsize=14)
+plt.xlabel("0 = Légitime | 1 = Fraude")
+plt.ylabel("Nombre de transactions")
+plt.tight_layout()
+plt.show()
+
+
+# ==========================================
+# GRAPH SCRIPT 2 : Matrice de Corrélation (Heatmap)
+# ==========================================
+plt.figure(figsize=(14, 10))
+col_numeriques = df_analysable.select_dtypes(include=[np.number]).columns
+correlation_matrix = df_analysable[col_numeriques].corr()
+
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f', linewidths=0.5)
+plt.title("Matrice de Corrélation Numérique\n[Idéal pour repérer la colinéarité et le Data Leakage]", fontsize=14)
+plt.tight_layout()
+plt.show()
+
+
+# ==========================================
+# GRAPH SCRIPT 3 : Histogrammes (Sécurisés contre les Infs et NaNs)
+# ==========================================
+features_numeriques_cles = ['failed_transaction_count_24h']
+
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+for i, feature in enumerate(features_numeriques_cles):
+    log_scale = True if feature == 'transaction_amount' else False
+    
+    # On filtre les valeurs manquantes spécifiques à cette colonne juste avant le tracé par sécurité
+    data_filtered = df_analysable.dropna(subset=[feature])
+    
+    # Si la colonne a une variance nulle (toutes les valeurs identiques), le KDE va planter. 
+    # On vérifie donc s'il y a plus d'une valeur unique.
+    has_variance = data_filtered[feature].nunique() > 1
+    
+    sns.histplot(
+        data=data_filtered, 
+        x=feature, 
+        hue='fraud_flag', 
+        kde=has_variance,  # Désactive le KDE automatiquement si pas de variance
+        element='step', 
+        stat='density', 
+        common_norm=False, 
+        ax=axes[i],
+        palette='Set1',
+        log_scale=log_scale
+    )
+    axes[i].set_title(f"Distribution de : {feature}")
+    if log_scale:
+        axes[i].set_xlabel(f"{feature} (Échelle Log)")
+
+plt.suptitle("Analyse bivariée des variables continues\n[Sécurisée contre les NaNs/Infs]", fontsize=14, y=1.05)
+plt.tight_layout()
+plt.show()
+
+
+# ==========================================
+# GRAPH SCRIPT 4 : Impact des variables catégorielles (Barres 100% empilées)
+# ==========================================
+variables_cat = [ 'device_type']
+
+for cat in variables_cat:
+    cross_tab = pd.crosstab(df_analysable[cat], df_analysable['fraud_flag'], normalize='index') * 100
+    
+    cross_tab.plot(kind='bar', stacked=True, color=['#4caf50', '#f44336'], figsize=(10, 5))
+    plt.title(f"Proportion de Fraude par {cat}", fontsize=12)
+    plt.xlabel(cat)
+    plt.ylabel("Pourcentage (%)")
+    plt.legend(["Légitime (0)", "Fraude (1)"], loc='lower left')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+'''
+# ==========================================
+# GRAPH SCRIPT 5 : Importance Mathématique des Features (Random Forest sécurisé)
+# ==========================================
+print("Calcul de l'importance des variables...")
+
+# Encodage et gestion des NaNs résiduels pour le modèle
+df_encoded = df_analysable.drop(columns=['fraud_risk'], errors='ignore')
+df_encoded = pd.get_dummies(df_encoded, drop_first=True)
+df_encoded = df_encoded.fillna(df_encoded.median()) # Remplissage de sécurité pour les arbres
+
+X = df_encoded.drop(columns=['fraud_flag'])
+y = df_encoded['fraud_flag']
+
+# Utilisez seulement 2 cœurs au lieu de tous les cœurs disponibles
+model = RandomForestClassifier(n_estimators=50, max_depth=10, random_state=42, n_jobs=2)
+model.fit(X, y)
+
+importance_df = pd.DataFrame({
+    'Feature': X.columns,
+    'Importance': model.feature_importances_
+}).sort_values(by='Importance', ascending=False).head(15)
+
+plt.figure(figsize=(12, 6))
+sns.barplot(data=importance_df, x='Importance', y='Feature', palette='viridis')
+plt.title("Top 15 des meilleures Features selon un modèle d'Arbre", fontsize=14)
+plt.xlabel("Score d'Importance")
+plt.ylabel("Variables")
+plt.tight_layout()
+plt.show()
+
+print("Analyse terminée ! Tous vos graphiques sont prêts et nettoyés.")'''
