@@ -1,0 +1,4 @@
+df["ICC"] = (
+    df["failure_rate"] * df["ratio_amount_log"] * (1 + df["is_international"])
+    * (1 + df["unusual_amount_flag"]) * df["fraud_risk"].map(Fraud_risk)
+)
