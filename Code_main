@@ -3,15 +3,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-# Chargement du jeu de données
+# 1. Chargement du jeu de données
 df = pd.read_csv('retail_fraud_detection_100k.csv')
 
-# Échantillonnage pour un rendu visuel propre (500 points sur 100 000)
-df_sample = df.sample(500, random_state=42)
+# 2. Échantillonnage pour un rendu visuel propre sans saturation (4000 points)
+df_sample = df.sample(600)
 
-# Ajout d'une quantité random pour eviter la superposition des points sur (0,0),(0,1)...
+#  Ajout d'une quantité random pour eviter la superposition des points
 np.random.seed(42)
-jitter_x = df_sample['previous_fraud_flag'] + 0.8*np.random.rand(len(df_sample)) - 0.4
+jitter_x = df_sample['unusual_amount_flag'] + 0.8*np.random.rand(len(df_sample)) - 0.4
 jitter_y = df_sample['unusual_location_flag'] + 0.8*np.random.rand(len(df_sample)) - 0.4
 fig, ax = plt.subplots(figsize=(9, 9))
 
@@ -19,12 +19,12 @@ fig, ax = plt.subplots(figsize=(9, 9))
 ax.axhline(0.5, color='#333333', linewidth=2, linestyle='--')
 ax.axvline(0.5, color='#333333', linewidth=2, linestyle='--')
 
-# Définition des couleurs selon la colonne fraud_flag
-# Vert pour Légitime, Rouge pour Fraude
+# Définition des couleurs selon la colonne T (fraud_flag)
+# Vert (#4cab31) pour Légitime (0), Rouge (#d9534f) pour Fraude (1)
 colors = np.where(df_sample['fraud_flag'] == 1, "#ff0800", "#37ff00")
 
-#Pour extraire les valeurs ou velocity_flag==1
-mask_prev_fraud = df_sample['velocity_flag'] == 1
+#Pour extraire les valeurs ou previous_fraud_flag==1
+mask_prev_fraud = df_sample['high_risk_device_flag'] == 1
 
 
 #Definition des tailles associés aux risque de fraude 
@@ -37,8 +37,7 @@ size_map = {
 sizes = df_sample['fraud_risk'].map(size_map)
 
 
-# Affichage du nuage de points
-# fraude avant = cercle, carré sinon
+# Affichage du nuage de points, si fraude, forme carré, sinon, cercle
 ax.scatter(
     jitter_x[~mask_prev_fraud],
     jitter_y[~mask_prev_fraud],
@@ -61,25 +60,23 @@ ax.scatter(
     zorder=0
 )
 
-
-# Ajustement des limites des axes pour une meilleure visualisation
 ax.set_xlim(-0.5, 1.5)
 ax.set_ylim(-0.5, 1.5)
 
-# Pour ne laisser que 0 et 1 sur les graduations
+# Personnalisation des graduations
 ax.set_xticks([0, 1])
 ax.set_yticks([0, 1])
 
-# Labellisation
-ax.set_xlabel("multiple_transactions_short_time", fontsize=12, labelpad=12, weight='bold')
-ax.set_ylabel("high_risk_device_flag", fontsize=12, labelpad=15, weight='bold')
+# Labellisation complète
+ax.set_xlabel("Unusual_amount_flag", fontsize=12, labelpad=12, weight='bold')
+ax.set_ylabel("Unusual_location_flag", fontsize=12, labelpad=15, weight='bold')
 
-# Légende 
+# Légende personnalisée en bas
 legend_elements = [
     Line2D([0], [0], marker='o', color='w', markerfacecolor="#37ff00", markersize=9, label='Légitime (T=0)'),
     Line2D([0], [0], marker='o', color='w', markerfacecolor="#ff0800", markersize=9, label='Fraude (T=1)'),
-    Line2D([0], [0], marker='o', color='black', linestyle='', markersize=9, label='velocity_flag = 0'),
-    Line2D([0], [0], marker='s', color='black', linestyle='', markersize=9, label='velocity_flag = 1'),
+    Line2D([0], [0], marker='o', color='black', linestyle='', markersize=9, label='high_risk_device_flag = 0'),
+    Line2D([0], [0], marker='s', color='black', linestyle='', markersize=9, label='high_risk_device_flag = 1'),
     Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=np.sqrt(75),label='Low'),
     Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=np.sqrt(350),label='Medium'),
     Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', markersize=np.sqrt(750), label='High')
@@ -88,3 +85,7 @@ ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0.5, -0.12)
 
 fig.tight_layout()
 plt.show()
+
+
+print(df_sample['fraud_risk'].unique())
+print(sizes.isna().sum())
