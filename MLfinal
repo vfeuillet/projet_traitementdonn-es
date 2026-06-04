@@ -1,0 +1,49 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_curve, roc_auc_score
+from sklearn.model_selection import train_test_split
+
+# 1. Chargement
+df = pd.read_csv("retail_fraud_detection_100k.csv")
+
+# 2. Création des variables nécessaires (Feature Engineering)
+# Calcul du ratio montant log
+df['ratio_amount_log'] = np.log1p(df['transaction_amount'] / (df['avg_transaction_amount_7d'] + 1e-6))
+
+# Calcul du taux d'échec
+df['failure_rate'] = df['failed_transaction_count_24h'] / (df['transaction_frequency_24h'] + 1e-6)
+
+# 3. Définition de votre score métier (formule avec les colonnes réelles)
+df['prob_fraud'] = (
+    df['failure_rate'] * df['ratio_amount_log'] * (1 + df['is_international']) * (1 + df['unusual_amount_flag'])
+)
+
+# 4. Régression Logistique
+X = df[['prob_fraud']] 
+y = df['fraud_flag'] # La colonne cible réelle est 'fraud_flag'
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42, stratify=y
+)
+
+model = LogisticRegression(class_weight="balanced")
+model.fit(X_train, y_train)
+
+# 5. Calcul ROC
+y_proba = model.predict_proba(X_test)[:, 1]
+auc = roc_auc_score(y_test, y_proba)
+
+# 6. Visualisation
+plt.figure(figsize=(8, 6))
+fpr, tpr, _ = roc_curve(y_test, y_proba)
+plt.plot(fpr, tpr, color="#E84545", linewidth=2.5, label=f"AUC = {auc:.3f}")
+plt.plot([0, 1], [0, 1], "--", color="#718096", linewidth=1, label="Aléatoire")
+plt.title("Courbe ROC - Modèle basé sur 'prob_fraud'", fontsize=14, fontweight="bold")
+plt.xlabel("Taux de Faux Positifs")
+plt.ylabel("Taux de Vrais Positifs")
+plt.legend(loc="lower right")
+plt.grid(alpha=0.3)
+plt.savefig("courbe_roc_finale.png", dpi=150, bbox_inches="tight")
+print(f"✅ Succès ! Courbe ROC générée (AUC : {auc:.3f})")
